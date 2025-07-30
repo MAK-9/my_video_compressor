@@ -1,8 +1,24 @@
 [package]
-name = "MyVideoCompressor"
+name = "vid-compress"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-clap = { version = "4.5", features = ["derive"]}
+
+# Command-line argument parsing
+clap = { version = "4.5", features = ["derive"] }
+
+# Check if ffmpeg is installed in PATH
 which = "5.0"
+
+# For downloading the ffmpeg zip from the internet
+reqwest = { version = "0.12", features = ["blocking", "json"] }
+
+# For extracting the ffmpeg-release zip file
+zip = "0.6"
+
+# For safely creating temporary files during download
+tempfile = "3.10"
+
+# for walking through directories recusively
+walkdir = "2.5"
