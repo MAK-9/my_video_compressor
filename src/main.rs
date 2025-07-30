@@ -59,6 +59,8 @@ fn compress_video(input: &PathBuf, output: &PathBuf)
 
         let status = Command::new(&ffmpeg)
             .args([
+                "-hide_banner",
+                "-loglevel", "error", // or "quiet"
                 "-i", input.to_str().unwrap(),
                 "-vcodec", "libx264",
                 "-crf", &crf.to_string(),
