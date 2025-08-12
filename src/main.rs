@@ -23,7 +23,6 @@ fn main()
 {
     ensure_ffmpeg_exists();
     
-
     let args = Args::parse();
     
     if !args.input.exists()
@@ -33,9 +32,6 @@ fn main()
     }
 
     let output = generate_output_path(&args.input);
-
-
-    
     
     println!("✅ Input: {}", args.input.display());
     println!("📁 Output: {}", output.display());
@@ -90,11 +86,12 @@ fn compress_video(input: &PathBuf, output: &PathBuf)
 
         let metadata = fs::metadata(output).expect("Failed to get output metadata");
         let size = metadata.len();
+        let original_size = fs::metadata(input).expect("Failed to get input metadata").len();
         println!("📦 Output file size: {:.2} MB", size as f64 / 1_048_576.0);
 
         if size <= MAX_SIZE_BYTES 
         {
-            println!("✅ Output is under 10MB, done!");
+            println!("✅ Output is under 10MB, done! - Reduced from {:.2} MB to {:.2} MB.", original_size as f64 / 1_048_576.0, size as f64 / 1_048_576.0);
             return;
         } 
         else 
