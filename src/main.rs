@@ -2,7 +2,9 @@ use clap::Parser;
 use std::{fs, io::Cursor, path::PathBuf, path::Path, process::Command};
 use zip::ZipArchive;
 use tempfile::NamedTempFile;
-use reqwest::blocking::get;
+use reqwest::blocking::Client;
+use std::time::Duration;
+
 
 const MAX_SIZE_BYTES: u64 = 10 * 1024/*Kilo*/ * 1024/*Mega*/; // 10MB
 const MAX_RETRIES: u8 = 6; // Try crf 28,30,32,34,36,38
@@ -58,20 +60,21 @@ fn compress_video(input: &PathBuf, output: &PathBuf)
         println!("🔧 Attempt {} with CRF={}", attempt + 1, crf);
 
         let status = Command::new(&ffmpeg)
-            .args([
-                "-hide_banner",
-                "-loglevel", "error", // or "quiet"
-                "-i", input.to_str().unwrap(),
-                "-vcodec", "libx264",
-                "-crf", &crf.to_string(),
-                "-preset", "fast",
-                "-acodec", "aac",
-                "-b:a", "128k",
-                "-movflags", "+faststart",
-                "-y",
-                output.to_str().unwrap(),
-            ])
-            .status();
+        .args([
+            "-i", input.to_str().unwrap(),
+            "-vcodec", "libx264",
+            "-crf", &crf.to_string(),
+            "-preset", "fast",
+            "-acodec", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            "-y",
+            output.to_str().unwrap(),
+        ])
+        .stdout(std::process::Stdio::null()) // suppress normal output
+        .stderr(std::process::Stdio::null()) // suppress errors unless we print manually
+        .status();
+    
 
         if let Err(e) = status 
         {
@@ -121,8 +124,8 @@ fn ensure_ffmpeg_exists() -> PathBuf {
     let download_url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip";
 
     let mut temp_zip = NamedTempFile::new().expect("Failed to create temp file");
-    let response = get(download_url).expect("Failed to download ffmpeg");
-    let bytes = response.bytes().expect("Failed to read downloaded file");
+    let bytes = download_ffmpeg(download_url).expect("Failed to download ffmpeg");
+
     std::io::copy(&mut Cursor::new(bytes), &mut temp_zip).expect("Failed to write to temp file");
 
     println!("📦 Extracting ffmpeg...");
@@ -172,4 +175,27 @@ fn find_ffmpeg_in_bin() -> Option<PathBuf> {
     }
 
     None
+}
+
+fn download_ffmpeg(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let client = Client::builder()
+        .timeout(Duration::from_secs(120)) // 2 min timeout
+        .build()?;
+
+    for attempt in 1..=3 {
+        println!("📥 Downloading ffmpeg (attempt {attempt})...");
+        match client.get(url).send() {
+            Ok(resp) if resp.status().is_success() => {
+                let bytes = resp.bytes()?.to_vec();
+                println!("✅ Download complete");
+                return Ok(bytes);
+            }
+            Ok(resp) => println!("⚠️ Server returned HTTP {}", resp.status()),
+            Err(e) => println!("⚠️ Download error: {e}"),
+        }
+        println!("🔄 Retrying in 3s...");
+        std::thread::sleep(Duration::from_secs(3));
+    }
+
+    Err("❌ Failed to download ffmpeg after 3 attempts".into())
 }
